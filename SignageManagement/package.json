@@ -1,0 +1,56 @@
+{
+  "name": "signage-management",
+  "version": "2.0.0",
+  "description": "간판 제작 관리 시스템 - 보안 및 성능 강화 버전",
+  "main": "app.js",
+  "scripts": {
+    "start": "NODE_ENV=production node app.js",
+    "dev": "nodemon app.js",
+    "test": "node test-connection.js",
+    "setup": "node setup-database.js",
+    "backup": "node backup-database.js",
+    "restore": "node restore-database.js",
+    "seed": "node seed-data.js",
+    "lint": "eslint *.js",
+    "security-check": "npm audit",
+    "update-deps": "npm update"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "fs-extra": "^11.3.0",
+    "helmet": "^7.1.0",
+    "multer": "^1.4.5-lts.1",
+    "path": "^0.12.7",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "signage",
+    "management",
+    "postgres",
+    "express",
+    "korean",
+    "business"
+  ],
+  "author": "간판 관리 시스템",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourcompany/signage-management"
+  },
+  "bugs": {
+    "url": "https://github.com/yourcompany/signage-management/issues"
+  },
+  "homepage": "https://github.com/yourcompany/signage-management#readme"
+}

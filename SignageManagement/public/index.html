@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간판 제작 관리 시스템</title>
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,">
+
+    <!-- External CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/4.3.0/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body class="bg-gray-50">
+    <!-- 헤더 -->
+    <header class="header bg-white shadow-sm border-b border-gray-200">
+        <div class="px-4 sm:px-6 lg:px-8 h-full">
+            <div class="flex justify-between items-center h-full">
+                <div class="flex items-center">
+                    <button id="menu-toggle" class="text-gray-500 hover:text-gray-700 lg:hidden">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <h1 class="ml-3 lg:ml-0 text-2xl font-bold text-gray-900">
+                        <i class="fas fa-store text-blue-600"></i>
+                        간판 제작 관리 시스템
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-500">
+                        <i class="fas fa-clock"></i>
+                        <span id="current-time"></span>
+                    </div>
+                    <button id="new-order-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        <i class="fas fa-plus"></i>
+                        새 주문
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 사이드바 -->
+    <aside id="sidebar" class="sidebar">
+        <div class="flex flex-col h-full">
+            <nav class="flex-1 px-4 py-6 space-y-2">
+                <!-- 대시보드 -->
+                <button data-tab="dashboard" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 bg-blue-50 text-blue-700 border-r-2 border-blue-700">
+                    <i class="fas fa-tachometer-alt mr-3 text-lg"></i>
+                    <span>대시보드</span>
+                </button>
+
+                <!-- 고객 관리 -->
+                <button data-tab="customers" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-users mr-3 text-lg"></i>
+                    <span>고객 관리</span>
+                </button>
+
+                <!-- 주문 관리 -->
+                <button data-tab="orders" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-clipboard-list mr-3 text-lg"></i>
+                    <span>주문 관리</span>
+                    <span id="order-badge" class="ml-auto bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full hidden">0</span>
+                </button>
+
+                <!-- 제품 관리 -->
+                <button data-tab="products" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-box mr-3 text-lg"></i>
+                    <span>제품 관리</span>
+                </button>
+
+                <!-- 파일 관리 -->
+                <button data-tab="files" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-folder mr-3 text-lg"></i>
+                    <span>파일 관리</span>
+                </button>
+
+                <!-- 리포트 -->
+                <button data-tab="reports" class="menu-item w-full flex items-center px-4 py-3 text-left rounded-lg transition duration-200 text-gray-700 hover:bg-gray-50">
+                    <i class="fas fa-chart-bar mr-3 text-lg"></i>
+                    <span>리포트</span>
+                </button>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="main-content">
+        <!-- 대시보드 -->
+        <div id="content-dashboard" class="tab-content p-6">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">대시보드</h2>
+                <p class="text-gray-600">간판 제작 현황을 한눈에 확인하세요</p>
+            </div>
+
+            <!-- 통계 카드들 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-users text-3xl text-blue-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">총 고객수</p>
+                            <p class="text-2xl font-bold text-gray-900" id="total-customers">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clipboard-list text-3xl text-green-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">총 주문수</p>
+                            <p class="text-2xl font-bold text-gray-900" id="total-orders">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clock text-3xl text-yellow-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">진행중 주문</p>
+                            <p class="text-2xl font-bold text-gray-900" id="pending-orders">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-won-sign text-3xl text-purple-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">총 매출</p>
+                            <p class="text-2xl font-bold text-gray-900" id="total-revenue">₩0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 차트 섹션 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie mr-2"></i>주문 상태 분포
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">
+                        <i class="fas fa-chart-line mr-2"></i>월별 매출 현황
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 최근 주문 테이블 -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">최근 주문</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제품</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">납기일</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-orders-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                    <div class="flex items-center justify-center">
+                                        <div class="spinner mr-2"></div>
+                                        데이터를 불러오는 중...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 고객 관리 -->
+        <div id="content-customers" class="tab-content p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">고객 관리</h2>
+                    <p class="text-gray-600">고객 정보를 관리하세요</p>
+                </div>
+                <button id="new-customer-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                    <i class="fas fa-plus mr-2"></i>새 고객 등록
+                </button>
+            </div>
+
+            <!-- 검색 -->
+            <div class="mb-6">
+                <div class="relative">
+                    <input type="text" id="customer-search" placeholder="고객명, 전화번호로 검색..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- 고객 목록 -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객명</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">연락처</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주소</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                    <div class="flex items-center justify-center">
+                                        <div class="spinner mr-2"></div>
+                                        데이터를 불러오는 중...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 주문 관리 -->
+        <div id="content-orders" class="tab-content p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">주문 관리</h2>
+                    <p class="text-gray-600">주문 현황을 관리하고 진행 상황을 추적하세요</p>
+                </div>
+                <button id="new-order-btn-orders" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                    <i class="fas fa-plus mr-2"></i>새 주문 등록
+                </button>
+            </div>
+
+            <!-- 주문 통계 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clipboard-list text-2xl text-blue-600"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">전체 주문</p>
+                            <p class="text-xl font-bold text-gray-900" id="orders-total">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">진행중</p>
+                            <p class="text-xl font-bold text-gray-900" id="orders-pending">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">완료</p>
+                            <p class="text-xl font-bold text-gray-900" id="orders-completed">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-won-sign text-2xl text-purple-600"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-500">이번 달 매출</p>
+                            <p class="text-lg font-bold text-gray-900" id="orders-revenue">₩0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 주문 목록 테이블 -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">주문 목록</h3>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-500">총 <span id="filtered-orders-count">0</span>건</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문번호</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객정보</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제품정보</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">납기일</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                                    <div class="flex flex-col items-center">
+                                        <div class="spinner mb-2"></div>
+                                        <p>주문 데이터를 불러오는 중...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 제품 관리 -->
+        <div id="content-products" class="tab-content p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">제품 관리</h2>
+                    <p class="text-gray-600">제품 정보를 관리하세요</p>
+                </div>
+                <button id="new-product-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                    <i class="fas fa-plus mr-2"></i>새 제품 등록
+                </button>
+            </div>
+
+            <!-- 검색 및 정렬 -->
+            <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                <div class="relative flex-1">
+                    <input type="text" id="product-search" placeholder="제품명으로 검색..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+                <select id="product-sort" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="name-asc">이름 순 (가나다)</option>
+                    <option value="name-desc">이름 순 (하나다)</option>
+                    <option value="unit_price-asc">가격 낮은 순</option>
+                    <option value="unit_price-desc">가격 높은 순</option>
+                </select>
+            </div>
+
+            <!-- 제품 통계 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-box text-2xl text-blue-600 mr-3"></i>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">총 제품 수</p>
+                            <p class="text-xl font-bold text-gray-900" id="products-total">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-filter text-2xl text-green-600 mr-3"></i>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">필터된 제품</p>
+                            <p class="text-xl font-bold text-gray-900" id="products-filtered">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-won-sign text-2xl text-purple-600 mr-3"></i>
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">평균 단가</p>
+                            <p class="text-xl font-bold text-gray-900" id="products-avg-price">₩0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 제품 목록 -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제품명</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">단가</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">등록일</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                    <div class="flex items-center justify-center">
+                                        <div class="spinner mr-2"></div>
+                                        데이터를 불러오는 중...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 파일 관리 -->
+        <div id="content-files" class="tab-content p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">파일 관리</h2>
+                    <p class="text-gray-600">업로드된 파일들을 관리하세요</p>
+                </div>
+                <button id="upload-files-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                    <i class="fas fa-upload mr-2"></i>파일 업로드
+                </button>
+            </div>
+
+            <!-- 검색 및 필터 -->
+            <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                <div class="relative flex-1">
+                    <input type="text" id="file-search" placeholder="파일명, 주문번호로 검색..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+                <select id="file-type-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="all">모든 파일</option>
+                    <option value="drawing">도면</option>
+                    <option value="photo">사진</option>
+                </select>
+            </div>
+
+            <!-- 파일 통계 -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-folder text-2xl text-blue-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">총 파일</p>
+                        <p class="text-xl font-bold text-gray-900" id="files-total">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-filter text-2xl text-green-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">필터된 파일</p>
+                        <p class="text-xl font-bold text-gray-900" id="files-filtered">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-hdd text-2xl text-purple-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">총 용량</p>
+                        <p class="text-xl font-bold text-gray-900" id="files-total-size">0 B</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-file-lines text-2xl text-yellow-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">도면</p>
+                        <p class="text-xl font-bold text-gray-900" id="files-drawing-count">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-image text-2xl text-red-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">사진</p>
+                        <p class="text-xl font-bold text-gray-900" id="files-photo-count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 파일 목록 -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">파일명</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">크기</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">업로드일</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="files-table" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                    <div class="flex items-center justify-center">
+                                        <div class="spinner mr-2"></div>
+                                        데이터를 불러오는 중...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 리포트 -->
+        <div id="content-reports" class="tab-content p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">리포트</h2>
+                    <p class="text-gray-600">매출 및 통계 리포트를 확인하세요</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="refresh-report-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        <i class="fas fa-refresh mr-2"></i>새로고침
+                    </button>
+                    <button id="export-report-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        <i class="fas fa-download mr-2"></i>내보내기
+                    </button>
+                </div>
+            </div>
+
+            <!-- 기간 선택 -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="flex flex-col sm:flex-row gap-4 items-end">
+                    <div>
+                        <label for="report-period" class="block text-sm font-medium text-gray-700 mb-1">기간 선택</label>
+                        <select id="report-period" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="week">최근 1주일</option>
+                            <option value="month" selected>이번 달</option>
+                            <option value="quarter">이번 분기</option>
+                            <option value="year">올해</option>
+                            <option value="custom">사용자 정의</option>
+                        </select>
+                    </div>
+                    <div id="custom-date-range" class="flex gap-2 hidden">
+                        <div>
+                            <label for="report-start-date" class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                            <input type="date" id="report-start-date" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label for="report-end-date" class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                            <input type="date" id="report-end-date" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 요약 통계 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-won-sign text-2xl text-green-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">총 매출</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-total-revenue">₩0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-clipboard-list text-2xl text-blue-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">총 주문</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-total-orders">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-check-circle text-2xl text-green-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">완료 주문</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-completed-orders">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-calculator text-2xl text-purple-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">평균 주문액</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-avg-order-value">₩0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-user-plus text-2xl text-yellow-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">신규 고객</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-new-customers">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-center">
+                        <i class="fas fa-percentage text-2xl text-red-600 mb-2"></i>
+                        <p class="text-sm font-medium text-gray-500">완료율</p>
+                        <p class="text-xl font-bold text-gray-900" id="report-completion-rate">0%</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 차트 섹션 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">일별 매출</h3>
+                    <div class="chart-container">
+                        <canvas id="sales-chart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">제품별 매출</h3>
+                    <div class="chart-container">
+                        <canvas id="product-chart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">주문 상태</h3>
+                    <div class="chart-container">
+                        <canvas id="status-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 상위 고객 및 최근 주문 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">상위 고객</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문수</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">매출</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-customers-table" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">데이터 로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">기간 내 주문</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문번호</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">고객</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제품</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-orders-report-table" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">데이터 로딩 중...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- JavaScript 모듈 -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

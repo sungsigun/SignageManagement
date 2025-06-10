@@ -1,0 +1,529 @@
+﻿// 간판 제작 관리 시스템 - 완전한 서버 (프론트엔드와 완벽 호환)
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3002;
+
+// PostgreSQL 연결 설정
+const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'postgres',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    ssl: false
+});
+
+// 미들웨어
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public')); // public 폴더에서 정적 파일 제공
+
+// 요청 로깅
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// 업로드 폴더 생성
+const uploadDirs = ['uploads', 'uploads/drawings', 'uploads/photos'];
+uploadDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
+
+// Multer 설정
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadPath = file.fieldname === 'drawing' ? 'uploads/drawings' : 'uploads/photos';
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// ===== 기본 라우트 =====
+
+// 메인 페이지 (index.html 자동 제공)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// API 정보
+app.get('/api', (req, res) => {
+    res.json({
+        message: '간판 제작 관리 시스템 API',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+            customers: 'GET/POST /api/customers, PUT /api/customers/:id',
+            orders: 'GET/POST /api/orders, PUT /api/orders/:id, PUT /api/orders/:id/status',
+            products: 'GET/POST /api/products, PUT /api/products/:id',
+            dashboard: 'GET /api/dashboard',
+            testDb: 'GET /api/test-db'
+        }
+    });
+});
+
+// 데이터베이스 연결 테스트
+app.get('/api/test-db', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW() as current_time, version()');
+        res.json({
+            success: true,
+            time: result.rows[0].current_time,
+            version: result.rows[0].version.split(' ')[0],
+            message: '데이터베이스 연결 성공!'
+        });
+    } catch (err) {
+        console.error('DB 연결 실패:', err);
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+});
+
+// ===== 고객 관리 API =====
+
+// 고객 목록 조회
+app.get('/api/customers', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM customers ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('고객 조회 오류:', err);
+        res.json([]);
+    }
+});
+
+// 고객 등록
+app.post('/api/customers', async (req, res) => {
+    try {
+        const { name, phone, address, memo } = req.body;
+
+        if (!name || !phone) {
+            return res.status(400).json({ error: '고객명과 연락처는 필수입니다.' });
+        }
+
+        const result = await pool.query(
+            'INSERT INTO customers (name, phone, address, memo) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, phone, address || '', memo || '']
+        );
+
+        console.log('새 고객 등록:', result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('고객 등록 오류:', err);
+        if (err.code === '23505') {
+            res.status(400).json({ error: '이미 등록된 전화번호입니다.' });
+        } else {
+            res.status(500).json({ error: '고객 등록 실패: ' + err.message });
+        }
+    }
+});
+
+// 고객 정보 수정
+app.put('/api/customers/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, phone, address, memo } = req.body;
+
+        if (!name || !phone) {
+            return res.status(400).json({ error: '고객명과 연락처는 필수입니다.' });
+        }
+
+        const result = await pool.query(
+            'UPDATE customers SET name = $1, phone = $2, address = $3, memo = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
+            [name, phone, address || '', memo || '', id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: '고객을 찾을 수 없습니다.' });
+        }
+
+        console.log('고객 정보 수정:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('고객 수정 오류:', err);
+        res.status(500).json({ error: '고객 정보 수정 실패: ' + err.message });
+    }
+});
+
+// ===== 제품 관리 API =====
+
+// 제품 목록 조회
+app.get('/api/products', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM products ORDER BY name');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('제품 조회 오류:', err);
+        // 기본 제품 데이터 반환
+        res.json([
+            { id: 1, name: 'LED 간판', unit_price: 250000, description: '평방미터당' },
+            { id: 2, name: '아크릴 간판', unit_price: 150000, description: '평방미터당' },
+            { id: 3, name: '네온사인', unit_price: 300000, description: '평방미터당' }
+        ]);
+    }
+});
+
+// 제품 등록
+app.post('/api/products', async (req, res) => {
+    try {
+        const { name, unit_price, description } = req.body;
+
+        if (!name || !unit_price) {
+            return res.status(400).json({ error: '제품명과 단가는 필수입니다.' });
+        }
+
+        const result = await pool.query(
+            'INSERT INTO products (name, unit_price, description) VALUES ($1, $2, $3) RETURNING *',
+            [name, unit_price, description || '']
+        );
+
+        console.log('새 제품 등록:', result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('제품 등록 오류:', err);
+        res.status(500).json({ error: '제품 등록 실패: ' + err.message });
+    }
+});
+
+// 제품 정보 수정
+app.put('/api/products/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, unit_price, description } = req.body;
+
+        if (!name || !unit_price) {
+            return res.status(400).json({ error: '제품명과 단가는 필수입니다.' });
+        }
+
+        const result = await pool.query(
+            'UPDATE products SET name = $1, unit_price = $2, description = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [name, unit_price, description || '', id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: '제품을 찾을 수 없습니다.' });
+        }
+
+        console.log('제품 정보 수정:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('제품 수정 오류:', err);
+        res.status(500).json({ error: '제품 정보 수정 실패: ' + err.message });
+    }
+});
+
+// ===== 주문 관리 API =====
+
+// 주문 목록 조회
+app.get('/api/orders', async (req, res) => {
+    try {
+        const result = await pool.query(`
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      ORDER BY o.created_at DESC
+    `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('주문 조회 오류:', err);
+        res.json([]);
+    }
+});
+
+// 주문 등록
+app.post('/api/orders', async (req, res) => {
+    try {
+        const { customer_id, product_type, size, width, height, amount, due_date, memo } = req.body;
+
+        if (!customer_id || !product_type || !amount || !due_date) {
+            return res.status(400).json({ error: '필수 항목을 모두 입력해주세요.' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO orders (customer_id, product_type, size, width, height, amount, due_date, memo, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '주문접수') RETURNING *`,
+            [customer_id, product_type, size || '', width || 0, height || 0, amount, due_date, memo || '']
+        );
+
+        // 상태 히스토리 추가
+        await pool.query(
+            'INSERT INTO order_status_history (order_id, status, memo) VALUES ($1, $2, $3)',
+            [result.rows[0].id, '주문접수', '새 주문이 접수되었습니다.']
+        );
+
+        console.log('새 주문 등록:', result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('주문 등록 오류:', err);
+        res.status(500).json({ error: '주문 등록 실패: ' + err.message });
+    }
+});
+
+// 주문 정보 수정
+app.put('/api/orders/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customer_id, product_type, size, width, height, amount, due_date, memo } = req.body;
+
+        if (!customer_id || !product_type || !amount || !due_date) {
+            return res.status(400).json({ error: '필수 항목을 모두 입력해주세요.' });
+        }
+
+        const result = await pool.query(
+            `UPDATE orders SET customer_id = $1, product_type = $2, size = $3, width = $4, height = $5, 
+       amount = $6, due_date = $7, memo = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9 RETURNING *`,
+            [customer_id, product_type, size || '', width || 0, height || 0, amount, due_date, memo || '', id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: '주문을 찾을 수 없습니다.' });
+        }
+
+        // 상태 히스토리 추가
+        await pool.query(
+            'INSERT INTO order_status_history (order_id, status, memo) VALUES ($1, $2, $3)',
+            [id, result.rows[0].status, '주문 정보가 수정되었습니다.']
+        );
+
+        console.log('주문 정보 수정:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('주문 수정 오류:', err);
+        res.status(500).json({ error: '주문 정보 수정 실패: ' + err.message });
+    }
+});
+
+// 주문 상태 업데이트 (두 가지 방식 모두 지원)
+app.put('/api/orders/:id/status', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, memo } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ error: '상태는 필수입니다.' });
+        }
+
+        const result = await pool.query(
+            'UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+            [status, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: '주문을 찾을 수 없습니다.' });
+        }
+
+        // 상태 히스토리 추가
+        await pool.query(
+            'INSERT INTO order_status_history (order_id, status, memo) VALUES ($1, $2, $3)',
+            [id, status, memo || `상태가 ${status}로 변경되었습니다.`]
+        );
+
+        console.log(`주문 #${id} 상태 변경: ${status}`);
+        res.json({
+            success: true,
+            message: '상태가 업데이트되었습니다.',
+            order: result.rows[0]
+        });
+    } catch (err) {
+        console.error('상태 업데이트 오류:', err);
+        res.status(500).json({ error: '상태 업데이트 실패: ' + err.message });
+    }
+});
+
+// ===== 파일 관리 API =====
+
+// 파일 업로드
+app.post('/api/upload', upload.fields([
+    { name: 'drawing', maxCount: 5 },
+    { name: 'photo', maxCount: 10 }
+]), async (req, res) => {
+    try {
+        const { order_id } = req.body;
+
+        if (!order_id) {
+            return res.status(400).json({ error: '주문 ID가 필요합니다.' });
+        }
+
+        const uploadedFiles = [];
+
+        // 도면 파일 처리
+        if (req.files.drawing) {
+            for (let file of req.files.drawing) {
+                const result = await pool.query(
+                    'INSERT INTO drawings (order_id, filename, original_name, file_path) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [order_id, file.filename, file.originalname, file.path]
+                );
+                uploadedFiles.push({ type: 'drawing', ...result.rows[0] });
+            }
+        }
+
+        // 사진 파일 처리
+        if (req.files.photo) {
+            for (let file of req.files.photo) {
+                const result = await pool.query(
+                    'INSERT INTO photos (order_id, filename, original_name, file_path) VALUES ($1, $2, $3, $4) RETURNING *',
+                    [order_id, file.filename, file.originalname, file.path]
+                );
+                uploadedFiles.push({ type: 'photo', ...result.rows[0] });
+            }
+        }
+
+        console.log(`주문 #${order_id}에 ${uploadedFiles.length}개 파일 업로드됨`);
+        res.json({
+            message: '파일 업로드 완료',
+            files: uploadedFiles
+        });
+    } catch (err) {
+        console.error('파일 업로드 오류:', err);
+        res.status(500).json({ error: '파일 업로드 실패: ' + err.message });
+    }
+});
+
+// ===== 대시보드 API =====
+
+// 대시보드 통계
+app.get('/api/dashboard', async (req, res) => {
+    try {
+        const dashboard = {
+            totalCustomers: 0,
+            totalOrders: 0,
+            pendingOrders: 0,
+            totalRevenue: 0,
+            statusDistribution: [],
+            weeklyOrders: []
+        };
+
+        try {
+            // 고객 수
+            const customerCount = await pool.query('SELECT COUNT(*) as count FROM customers');
+            dashboard.totalCustomers = parseInt(customerCount.rows[0].count) || 0;
+
+            // 주문 수
+            const orderCount = await pool.query('SELECT COUNT(*) as count FROM orders');
+            dashboard.totalOrders = parseInt(orderCount.rows[0].count) || 0;
+
+            // 진행중 주문 수
+            const pendingCount = await pool.query("SELECT COUNT(*) as count FROM orders WHERE status IN ('주문접수', '도면작업', '제작중')");
+            dashboard.pendingOrders = parseInt(pendingCount.rows[0].count) || 0;
+
+            // 총 매출 (완료된 주문)
+            const revenue = await pool.query("SELECT COALESCE(SUM(amount), 0) as total FROM orders WHERE status = '완료'");
+            dashboard.totalRevenue = parseInt(revenue.rows[0].total) || 0;
+
+            // 상태별 분포
+            const statusDist = await pool.query("SELECT status, COUNT(*) as count FROM orders GROUP BY status ORDER BY count DESC");
+            dashboard.statusDistribution = statusDist.rows;
+
+        } catch (e) {
+            console.log('일부 테이블이 없습니다. 기본 데이터를 사용합니다.');
+        }
+
+        res.json(dashboard);
+    } catch (err) {
+        console.error('대시보드 오류:', err);
+        res.status(500).json({ error: '대시보드 로딩 실패: ' + err.message });
+    }
+});
+
+// ===== 검색 API =====
+
+// 통합 검색
+app.get('/api/search', async (req, res) => {
+    try {
+        const { q, type } = req.query;
+
+        if (!q) {
+            return res.status(400).json({ error: '검색어를 입력하세요.' });
+        }
+
+        let result = [];
+
+        if (type === 'customers') {
+            try {
+                const searchResult = await pool.query(
+                    'SELECT * FROM customers WHERE name ILIKE $1 OR phone ILIKE $1 OR address ILIKE $1 ORDER BY created_at DESC',
+                    [`%${q}%`]
+                );
+                result = searchResult.rows;
+            } catch (e) {
+                result = [];
+            }
+        } else if (type === 'orders') {
+            try {
+                const searchResult = await pool.query(`
+          SELECT o.*, c.name as customer_name, c.phone as customer_phone
+          FROM orders o 
+          LEFT JOIN customers c ON o.customer_id = c.id 
+          WHERE o.product_type ILIKE $1 OR c.name ILIKE $1 OR o.memo ILIKE $1
+          ORDER BY o.created_at DESC
+        `, [`%${q}%`]);
+                result = searchResult.rows;
+            } catch (e) {
+                result = [];
+            }
+        }
+
+        res.json(result);
+    } catch (err) {
+        console.error('검색 오류:', err);
+        res.status(500).json({ error: '검색 실패: ' + err.message });
+    }
+});
+
+// 정적 파일 제공
+app.use('/uploads', express.static('uploads'));
+
+// 404 처리
+app.use('*', (req, res) => {
+    res.status(404).json({
+        error: 'API 엔드포인트를 찾을 수 없습니다.',
+        path: req.originalUrl
+    });
+});
+
+// 오류 처리
+app.use((err, req, res, next) => {
+    console.error('서버 오류:', err);
+    res.status(500).json({
+        error: '서버 오류가 발생했습니다.',
+        message: err.message
+    });
+});
+
+// 서버 시작
+app.listen(PORT, () => {
+    console.log(`\n🚀 간판 관리 시스템 서버 시작!`);
+    console.log(`📍 메인 페이지: http://localhost:${PORT}`);
+    console.log(`🔧 DB 테스트: http://localhost:${PORT}/api/test-db`);
+    console.log(`📊 API 정보: http://localhost:${PORT}/api`);
+    console.log(`\n✅ 모든 API가 활성화되었습니다!`);
+    console.log(`💡 테이블이 없다면 'npm run setup'을 실행하세요.\n`);
+});
+
+// 종료 처리
+process.on('SIGINT', async () => {
+    console.log('\n🔌 서버를 종료합니다...');
+    try {
+        await pool.end();
+        console.log('✅ 정상 종료되었습니다.');
+    } catch (err) {
+        console.log('⚠️ 종료 중 오류:', err.message);
+    }
+    process.exit(0);
+});
